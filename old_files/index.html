@@ -1211,30 +1211,38 @@ footer::before{
           <div id="stats-editor"></div>
           <button class="nb" onclick="addStat()" style="margin-top:8px">+ Add Stat</button>
         </div>
-        <div class="set-section" style="border-color:rgba(212,168,67,.35);background:rgba(212,168,67,.04)">
-          <div class="set-ttl" style="color:var(--gold);font-size:.55rem">🚀 Publish — Make Changes Live For Everyone</div>
-          <p style="font-size:.75rem;color:var(--white);line-height:1.8;margin-bottom:14px">
-            After saving your settings, click <strong style="color:var(--gold)">"Download & Deploy"</strong> below.<br>
-            Then drag the downloaded file to <strong style="color:var(--white)">netlify.com/drop</strong> — done! Everyone sees your changes.
-          </p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="hero-btn-p" onclick="saveSettings()" style="max-width:none;padding:13px 24px">💾 Save Settings</button>
-            <button class="hero-btn-p" onclick="exportAndDeploy()" style="max-width:none;padding:13px 24px;background:linear-gradient(135deg,#c49a2a,#f0c866);color:#000">
-              📦 Download & Deploy
-            </button>
+        <div class="set-section">
+          <div class="set-ttl">☁️ Cloud Sync — Everyone Sees Your Changes</div>
+          <div id="cloud-status" style="padding:12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.07);margin-bottom:12px;font-size:.72rem;color:var(--dim);line-height:1.7">
+            🔴 Not connected. Set up cloud sync below so all visitors see your changes instantly.
           </div>
-          <div style="margin-top:12px;padding:10px 14px;background:rgba(0,0,0,.3);border-left:3px solid var(--gold);font-size:.68rem;color:var(--dim);line-height:1.8">
-            <strong style="color:var(--gold)">How it works:</strong><br>
-            1️⃣ Change your name, photos, WhatsApp etc.<br>
-            2️⃣ Click <strong style="color:var(--white)">Download & Deploy</strong><br>
-            3️⃣ Go to <strong style="color:var(--white)">netlify.com/drop</strong><br>
-            4️⃣ Drag the downloaded file there<br>
-            5️⃣ ✅ Everyone sees your updated site!
+          <div class="frow">
+            <div class="fg">
+              <label class="fl">JSONBin Bin ID <span style="color:var(--dim);text-transform:none;letter-spacing:0">(free at jsonbin.io)</span></label>
+              <input class="fi" id="set-bin-id" placeholder="e.g. 64ab12cd3e1234...">
+            </div>
+            <div class="fg">
+              <label class="fl">JSONBin API Key</label>
+              <input class="fi" id="set-bin-key" placeholder="$2b$10$...">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <button class="nb fill" onclick="setupCloud()" style="font-size:.55rem">🔗 Connect Cloud</button>
+            <button class="nb" onclick="window.open('https://jsonbin.io','_blank')" style="font-size:.55rem">📖 Get Free API Key</button>
+          </div>
+          <div style="margin-top:10px;padding:10px 12px;background:rgba(212,168,67,.04);border:1px solid rgba(212,168,67,.1);font-size:.64rem;color:var(--dim);line-height:1.75">
+            <strong style="color:var(--gold)">How to set up (2 minutes):</strong><br>
+            1. Go to <strong style="color:var(--white)">jsonbin.io</strong> → Sign up free<br>
+            2. Click <strong style="color:var(--white)">"Create Bin"</strong> → paste <code style="color:var(--gold)">{}</code> → Save<br>
+            3. Copy the <strong style="color:var(--white)">Bin ID</strong> (from URL) and your <strong style="color:var(--white)">API Key</strong><br>
+            4. Paste both above → Click Connect → Done ✓<br>
+            5. Now every time you <strong style="color:var(--white)">Save Settings</strong>, all visitors see it instantly 🚀
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+          <button class="hero-btn-p" onclick="saveSettings()" style="max-width:none;padding:12px 22px">💾 Save & Sync to Everyone</button>
           <button class="nb" onclick="goHome()">👁 Preview Site</button>
-          <button class="nb" onclick="clearSaved()" style="border-color:rgba(220,50,50,.35);color:#e87">🗑 Reset to Defaults</button>
+          <button class="nb" onclick="clearSaved()" style="border-color:rgba(220,50,50,.35);color:#e87">🗑 Reset</button>
         </div>
       </div>
     </div>
@@ -1855,55 +1863,112 @@ function toast(msg,type){clearTimeout(_tt);const el=document.getElementById('toa
   el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drag');openBulk({target:{files:e.dataTransfer.files,value:''}},id==='ubox'?'user':'admin')});
 });
 
-// ═══ LOCALSTORAGE ═══
+// ═══ CLOUD SYNC (JSONBin.io) ══════════════════════════
 const _SK_LOCAL=['settings','stats','services','testimonials','whyItems','heroSlides'];
+const _SK_CLOUD=['settings','stats','services','testimonials','whyItems','heroSlides','publicPhotos','users'];
+let _cloudBinId='';
+let _cloudApiKey='';
 
-function saveToStorage(){
+function loadCloudCreds(){
   try{
-    const d={};
-    _SK_LOCAL.forEach(k=>d[k]=S[k]);
-    // Also save photos and users
-    d.publicPhotos=S.publicPhotos;
-    d.users=S.users;
-    localStorage.setItem('rpStudio_v6',JSON.stringify(d));
+    const r=localStorage.getItem('rpStudio_cloud_v1');
+    if(!r)return;
+    const d=JSON.parse(r);
+    _cloudBinId=d.binId||'';
+    _cloudApiKey=d.apiKey||'';
+    if(_cloudBinId){
+      const bi=document.getElementById('set-bin-id');if(bi)bi.value=_cloudBinId;
+      const bk=document.getElementById('set-bin-key');if(bk)bk.value=_cloudApiKey;
+    }
   }catch(e){}
 }
 
+function saveCloudCreds(){
+  const b=document.getElementById('set-bin-id')?.value.trim();
+  const k=document.getElementById('set-bin-key')?.value.trim();
+  if(b)_cloudBinId=b;
+  if(k)_cloudApiKey=k;
+  try{localStorage.setItem('rpStudio_cloud_v1',JSON.stringify({binId:_cloudBinId,apiKey:_cloudApiKey}))}catch(e){}
+}
+
+function setCloudStatus(msg,ok){
+  const el=document.getElementById('cloud-status');if(!el)return;
+  const icon=ok===true?'🟢':ok===false?'🔴':'🟡';
+  el.innerHTML=icon+' '+msg;
+  el.style.borderColor=ok===true?'rgba(60,190,90,.3)':ok===false?'rgba(220,50,50,.3)':'rgba(212,168,67,.3)';
+  el.style.color=ok===true?'#6de89a':ok===false?'#e87':'var(--gold)';
+}
+
+async function setupCloud(){
+  saveCloudCreds();
+  if(!_cloudBinId||!_cloudApiKey){toast('Enter both Bin ID and API Key','err');return;}
+  setCloudStatus('Testing connection…',null);
+  try{
+    const r=await fetch(`https://api.jsonbin.io/v3/b/${_cloudBinId}/latest`,{
+      headers:{'X-Master-Key':_cloudApiKey,'X-Bin-Meta':'false'}
+    });
+    if(!r.ok)throw new Error('Status '+r.status+' — check your Bin ID and API Key');
+    setCloudStatus('Connected ✓ — Save Settings to push your changes to all visitors!',true);
+    toast('☁️ Cloud connected successfully!','ok');
+  }catch(e){
+    setCloudStatus('Failed: '+e.message,false);
+    toast('Connection failed','err');
+  }
+}
+
+async function pushToCloud(){
+  if(!_cloudBinId||!_cloudApiKey)return false;
+  try{
+    const data={};
+    _SK_CLOUD.forEach(k=>data[k]=S[k]);
+    data._savedAt=new Date().toISOString();
+    const r=await fetch(`https://api.jsonbin.io/v3/b/${_cloudBinId}`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':_cloudApiKey,'X-Bin-Versioning':'false'},
+      body:JSON.stringify(data)
+    });
+    return r.ok;
+  }catch(e){return false;}
+}
+
+async function pullFromCloud(){
+  if(!_cloudBinId||!_cloudApiKey)return false;
+  try{
+    const r=await fetch(`https://api.jsonbin.io/v3/b/${_cloudBinId}/latest`,{
+      headers:{'X-Master-Key':_cloudApiKey,'X-Bin-Meta':'false'}
+    });
+    if(!r.ok)return false;
+    const data=await r.json();
+    if(!data||!data.settings)return false;
+    _SK_CLOUD.forEach(k=>{if(data[k]!==undefined)S[k]=data[k]});
+    return true;
+  }catch(e){return false;}
+}
+
+// ═══ LOCALSTORAGE (local fallback) ═══
+function saveToStorage(){
+  try{const d={};_SK_LOCAL.forEach(k=>d[k]=S[k]);localStorage.setItem('rpStudio_v6',JSON.stringify(d))}catch(e){}
+}
 function loadFromStorage(){
   try{
-    // Step 1: Apply baked defaults FIRST (set by admin at export time)
-    // These contain all photos, settings, users etc.
     if(window.__BAKED_DEFAULTS__){
       const b=window.__BAKED_DEFAULTS__;
-      Object.keys(b).forEach(k=>{if(b[k]!==undefined)S[k]=b[k]});
+      [..._SK_LOCAL,'publicPhotos','users'].forEach(k=>{if(b[k]!==undefined)S[k]=b[k]});
     }
-    // Step 2: Overlay ONLY settings/stats/services from localStorage
-    // NEVER overwrite publicPhotos or heroSlides from localStorage
-    // because new visitors have empty localStorage and would wipe the baked photos
     const r=localStorage.getItem('rpStudio_v6');
     if(!r)return;
     const d=JSON.parse(r);
-    const localOnlyKeys=['settings','stats','services','testimonials','whyItems'];
-    localOnlyKeys.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]});
-    // Only restore photos from localStorage if this IS the admin's own device
-    // (detected by having the imgbbKey set in localStorage settings)
-    if(d.settings&&d.settings.imgbbKey&&d.publicPhotos){
-      S.publicPhotos=d.publicPhotos;
-    }
-    if(d.heroSlides&&d.heroSlides.length>0){
-      S.heroSlides=d.heroSlides;
-    }
+    _SK_LOCAL.forEach(k=>{if(d[k]!==undefined)S[k]=d[k]});
   }catch(e){}
 }
-
 function clearSaved(){
   if(!confirm('Reset ALL settings to factory defaults?'))return;
   localStorage.removeItem('rpStudio_v6');
   location.reload();
 }
 
-// ═══ SAVE SETTINGS (local only) ═══
-function saveSettings(){
+// ═══ SAVE SETTINGS ═══
+async function saveSettings(){
   S.settings.studioName=document.getElementById('set-name')?.value||S.settings.studioName;
   S.settings.tagline=document.getElementById('set-tagline')?.value||S.settings.tagline;
   S.settings.city=document.getElementById('set-city')?.value||S.settings.city;
@@ -1916,70 +1981,49 @@ function saveSettings(){
   S.settings.yt=document.getElementById('set-yt')?.value||S.settings.yt;
   S.settings.hours=document.getElementById('set-hours')?.value||S.settings.hours;
   const key=document.getElementById('set-key')?.value;if(key)S.settings.imgbbKey=key;
+  // Also pick up cloud creds if entered
+  const b=document.getElementById('set-bin-id')?.value.trim();
+  const k=document.getElementById('set-bin-key')?.value.trim();
+  if(b)_cloudBinId=b;
+  if(k)_cloudApiKey=k;
+  if(_cloudBinId&&_cloudApiKey)saveCloudCreds();
+  // Save locally first (instant)
   saveToStorage();
   applySettings();
   buildAdmStats();
-  toast('✓ Saved! Now click "Download & Deploy" to publish for everyone.','ok');
-}
-
-// ═══ EXPORT & DEPLOY — bakes ALL data into HTML, ready for Netlify ═══
-function exportAndDeploy(){
-  toast('⏳ Preparing your site…','');
-  setTimeout(()=>{
-    try{
-      // Collect ALL current data — settings, photos, hero slides, users, everything
-      const baked={
-        settings:S.settings,
-        stats:S.stats,
-        services:S.services,
-        testimonials:S.testimonials,
-        whyItems:S.whyItems,
-        heroSlides:S.heroSlides,
-        publicPhotos:S.publicPhotos,
-        users:S.users
-      };
-
-      // Get source HTML
-      let html=document.documentElement.outerHTML;
-      // Fix DOCTYPE (outerHTML strips it)
-      if(!html.startsWith('<!DOCTYPE')){html='<!DOCTYPE html>\n'+html;}
-
-      // Remove any previously baked defaults
-      html=html.replace(/<script id="baked-defaults">[\s\S]*?<\/script>\s*/g,'');
-
-      // Build new baked defaults script with ALL data
-      const dataStr=JSON.stringify(baked);
-      const bakedScript=`<script id="baked-defaults">window.__BAKED_DEFAULTS__=${dataStr};<\/script>`;
-
-      // Inject right before </head>
-      html=html.replace('</head>',bakedScript+'\n</head>');
-
-      // Verify photos are in the export
-      const photoCount=(baked.publicPhotos||[]).length;
-      const heroCount=(baked.heroSlides||[]).length;
-
-      // Download the file
-      const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url;
-      const name=(S.settings.studioName||'studio').replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
-      a.download=name+'_website.html';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
-
-      toast(`✅ Downloaded! ${photoCount} photos + ${heroCount} hero slides included. Drag to netlify.com/drop 🚀`,'ok');
-    }catch(err){
-      toast('Export error: '+err.message,'err');
-      console.error('Export failed:',err);
+  // Push to cloud
+  if(_cloudBinId&&_cloudApiKey){
+    toast('⏳ Syncing to cloud…','');
+    const ok=await pushToCloud();
+    if(ok){
+      setCloudStatus('Last synced: '+new Date().toLocaleTimeString()+' ✓ All visitors will see your changes now!',true);
+      toast('✅ Saved & live for everyone! 🚀','ok');
+    }else{
+      setCloudStatus('Sync failed — check API key or internet connection',false);
+      toast('Saved locally. Cloud sync failed.','err');
     }
-  },400);
+  }else{
+    toast('✓ Saved locally. Connect cloud sync above to share with everyone.','ok');
+  }
 }
 
 // ═══ INIT ═══
 loadFromStorage();
+loadCloudCreds();
+// Try to pull from cloud on page load (so visitors get latest data)
+(async()=>{
+  loadCloudCreds();
+  if(_cloudBinId&&_cloudApiKey){
+    const ok=await pullFromCloud();
+    if(ok){
+      applySettings();
+      updateNav();
+      if(document.getElementById('cloud-status')){
+        setCloudStatus('Live data loaded ✓ — '+new Date().toLocaleTimeString(),true);
+      }
+    }
+  }
+})();
 applySettings();
 updateNav();
 window.addEventListener('resize',()=>updateNav());
