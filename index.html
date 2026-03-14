@@ -1879,25 +1879,35 @@ function toast(msg,type){clearTimeout(_tt);const el=document.getElementById('toa
 });
 
 // ═══ JSONBIN CLOUD SYNC ═══════════════════════════════
-let _binId='';
-let _binKey='';
+// ⚠️ THESE ARE SET BY ADMIN — DO NOT EDIT MANUALLY
+// Admin saves credentials via Settings tab → they get baked here
+let _binId = localStorage.getItem('rpStudio_binId') || '';
+let _binKey = localStorage.getItem('rpStudio_binKey') || '';
+
+// If admin has set credentials in this file directly, use those
+// (set when admin clicks Save & Publish with credentials entered)
+const _HARDCODED_BIN_ID   = '%%BIN_ID%%';
+const _HARDCODED_BIN_KEY  = '%%BIN_KEY%%';
+if(_HARDCODED_BIN_ID !== '%%BIN_ID%%'){_binId=_HARDCODED_BIN_ID;}
+if(_HARDCODED_BIN_KEY !== '%%BIN_KEY%%'){_binKey=_HARDCODED_BIN_KEY;}
+
 const _STORE_KEY='rpStudio_v7';
 
-// Load saved credentials from localStorage
+// Load saved credentials
 function loadCreds(){
   try{
-    const c=JSON.parse(localStorage.getItem('rpStudio_creds')||'{}');
-    _binId=c.binId||'';_binKey=c.binKey||'';
+    // Already loaded at top from hardcoded values or localStorage
     const bi=document.getElementById('set-bin-id');if(bi&&_binId)bi.value=_binId;
     const bk=document.getElementById('set-bin-key');if(bk&&_binKey)bk.value=_binKey;
   }catch(e){}
 }
+
+// Save credentials — stored in localStorage AND baked into file on next Save & Publish
 function saveCreds(){
   const bi=document.getElementById('set-bin-id')?.value.trim();
   const bk=document.getElementById('set-bin-key')?.value.trim();
-  if(bi)_binId=bi;
-  if(bk)_binKey=bk;
-  try{localStorage.setItem('rpStudio_creds',JSON.stringify({binId:_binId,binKey:_binKey}))}catch(e){}
+  if(bi){_binId=bi;localStorage.setItem('rpStudio_binId',bi);}
+  if(bk){_binKey=bk;localStorage.setItem('rpStudio_binKey',bk);}
 }
 
 function setSyncStatus(msg,state){
@@ -2004,7 +2014,6 @@ function clearSaved(){
 
 // ═══ SAVE & PUBLISH ═══
 async function saveSettings(){
-  // Read all form fields
   S.settings.studioName=document.getElementById('set-name')?.value||S.settings.studioName;
   S.settings.tagline=document.getElementById('set-tagline')?.value||S.settings.tagline;
   S.settings.city=document.getElementById('set-city')?.value||S.settings.city;
@@ -2017,31 +2026,49 @@ async function saveSettings(){
   S.settings.yt=document.getElementById('set-yt')?.value||S.settings.yt;
   S.settings.hours=document.getElementById('set-hours')?.value||S.settings.hours;
   const k=document.getElementById('set-key')?.value;if(k)S.settings.imgbbKey=k;
-
-  // Save credentials if entered
   saveCreds();
-
-  // Save locally first (instant)
   saveLocal();
   applySettings();
   buildAdmStats();
 
-  // Push to cloud if connected
   if(_binId&&_binKey){
-    setSyncStatus('Saving…','loading');
+    setSyncStatus('Saving to cloud…','loading');
     toast('⏳ Publishing to everyone…','');
     const ok=await pushData();
     if(ok){
+      // Also bake credentials into HTML and auto-download
+      // so when re-uploaded to Netlify, all visitors get credentials too
+      bakeAndDownload();
       const t=new Date().toLocaleTimeString();
       setSyncStatus('✅ Published at '+t+' — All visitors see your changes now!','ok');
-      toast('✅ Published! Everyone can see your changes now 🚀','ok');
+      toast('✅ Published! Re-upload the downloaded file to Netlify once → done forever 🚀','ok');
     }else{
       setSyncStatus('Save failed — check internet and try again.','err');
-      toast('Cloud save failed. Saved locally only.','err');
+      toast('Cloud save failed. Check credentials.','err');
     }
   }else{
-    toast('Saved locally. Enter Bin ID + Key above to publish to everyone.','ok');
+    toast('Enter Bin ID + Master Key above first.','err');
   }
+}
+
+// Bake credentials into HTML and download — needed ONCE after first setup
+function bakeAndDownload(){
+  try{
+    let html=document.documentElement.outerHTML;
+    if(!html.startsWith('<!DOCTYPE'))html='<!DOCTYPE html>\n'+html;
+    // Replace placeholder credentials with real ones
+    html=html.replace(/const _HARDCODED_BIN_ID\s*=\s*'[^']*'/,`const _HARDCODED_BIN_ID   = '${_binId}'`);
+    html=html.replace(/const _HARDCODED_BIN_KEY\s*=\s*'[^']*'/,`const _HARDCODED_BIN_KEY  = '${_binKey}'`);
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='bala_photography_website.html';
+    document.body.appendChild(a);a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast('📦 File downloaded — upload to Netlify ONCE and you never need to do this again!','ok');
+  }catch(e){console.error('Bake failed:',e);}
 }
 
 // ═══ INIT — Load data on page open ═══
